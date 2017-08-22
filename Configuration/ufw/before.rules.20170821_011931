@@ -1,0 +1,141 @@
+
+# rules.before
+#
+# Rules that should be run before the ufw command line added rules. Custom
+# rules should be added to one of these chains:
+#   ufw-before-input
+#   ufw-before-output
+#   ufw-before-forward
+#
+
+# Don't delete these required lines, otherwise there will be errors
+*filter
+:ufw-before-input - [0:0]
+:ufw-before-output - [0:0]
+:ufw-before-forward - [0:0]
+:ufw-not-local - [0:0]
+# End required lines
+
+# MK, March 2015
+# ...allow forwarding of specific traffic, as follows...
+-A ufw-before-forward -d 192.168.100.1 -j DROP
+-A ufw-before-forward -s 192.168.100.1 -j DROP
+-A ufw-before-forward -s 10.0.0.254 -j DROP
+-A ufw-before-forward -d 10.0.0.254 -j DROP
+
+
+
+######################################################
+# STANDARD IP-Weiterleitungsregeln, Matze April 2015 #
+######################################################
+#
+-A ufw-before-forward -i eth0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+#-A ufw-before-forward -i eth1 -o eth0 -d 0.0.0.0/0 -s 10.0.0.13 -j ACCEPT
+#-A ufw-before-forward -i eth1 -o eth0 -d 0.0.0.0/0 -s 10.0.0.199 -j ACCEPT
+#
+# CIFS / SMB-Filesharing for 
+#  SRC,DST,PORTS
+#SRC=10.0.0.12
+#DST=192.168.100.2
+#PORTS="445 137 138 139"
+# run_here...
+#for aPort in $PORTS; do
+-A ufw-before-forward -i eth1 -o eth0 -d 192.168.100.2 -s 10.0.0.0/24 -p tcp --dport 445 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+-A ufw-before-forward -i eth1 -o eth0 -s 192.168.100.2 -d 10.0.0.12 -p tcp --sport 445 -m state --state ESTABLISHED,RELATED -j ACCEPT
+-A ufw-before-forward -i eth1 -o eth0 -d 192.168.100.2 -s 10.0.0.0/28 -p tcp --dport 445 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+-A ufw-before-forward -i eth0 -o eth1 -s 192.168.100.2 -d 10.0.0.0/28 -p tcp --sport 445 -m state --state ESTABLISHED,RELATED -j ACCEPT
+# -A ufw-before-forward -i eth1 -o eth0 -d 192.168.100.2 -s 10.0.0.12 -p tcp --dport 137 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+# -A ufw-before-forward -i eth1 -o eth0 -s 192.168.100.2 -d 10.0.0.12 -p tcp --sport 137 -m state --state ESTABLISHED,RELATED -j ACCEPT
+# -A ufw-before-forward -i eth1 -o eth0 -d 192.168.100.2 -s 10.0.0.12 -p tcp --dport 138 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+# -A ufw-before-forward -i eth1 -o eth0 -s 192.168.100.2 -d 10.0.0.12 -p tcp --sport 138 -m state --state ESTABLISHED,RELATED -j ACCEPT
+-A ufw-before-forward -i eth1 -o eth0 -d 192.168.100.2 -s 10.0.0.12 -p tcp --dport 139 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+-A ufw-before-forward -i eth1 -o eth0 -s 192.168.100.2 -d 10.0.0.12 -p tcp --sport 139 -m state --state ESTABLISHED,RELATED -j ACCEPT
+-A ufw-before-forward -i eth1 -o eth0 -d 192.168.100.2 -s 10.0.0.0/28 -p tcp --dport 139 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+-A ufw-before-forward -i eth0 -o eth1 -s 192.168.100.2 -d 10.0.0.0/28 -p tcp --sport 139 -m state --state ESTABLISHED,RELATED -j ACCEPT
+#-A ufw-before-forward -i eth1 -o eth0 -d 0.0.0.0/0 -s 10.0.0.253 -j ACCEPT
+#-A ufw-before-forward -i eth1 -o eth0 -d 192.168.100.0/24 -s 10.0.0.0/25 -j ACCEPT
+#
+######################################################
+
+# Dante - Allow local outgoing danted traffic (based on Unix' userid)
+#
+# @TODO: Don't use (used by others!) nobody user-id.
+# -A ufw-before-output -o eth0 -s 192.168.100.100 -m owner --uid-owner nobody # ...additionally conn-tracking is not neccessary in the current impl., meaning the pattern, a.s.o... see ufw and iptables behavior... # -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT 
+-A ufw-before-output -o eth0 -s 192.168.100.100  -m owner --uid-owner nobody -j ACCEPT 
+-A ufw-before-output -o lo -s 127.0.0.1 -d 127.0.0.1 -m owner --uid-owner nobody -j ACCEPT 
+-A ufw-before-output -o lo -s 127.0.0.1 -d 127.0.0.1 -m owner --uid-owner proxy -j ACCEPT 
+#-A ufw-before-output -o lo -s 127.0.0.1 -d 127.0.0.1 -m owner --uid-owner debian-tor -j ACCEPT 
+-A ufw-before-output -o eth0 -s 192.168.100.100 -d 8.8.8.8  -p udp --dport 53   -m owner --uid-owner bind -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT 
+-A ufw-before-output -o eth0 -s 192.168.100.100 -d 8.8.4.4 -p udp --dport 53  -m owner --uid-owner bind -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT 
+#-A ufw-before-output -o lo -s 127.0.0.1 -p tcp --dport 1079 -m owner --uid-owner debian-tor -j ACCEPT 
+#-A ufw-before-output -o eth0 -s 192.168.100.100 ! -d 192.168.0.0/16 -m owner --uid-owner debian-tor -j ACCEPT 
+#-A ufw-before-output -o lo -d 127.0.0.1 -p tcp --dport 1078 -m owner --uid-owner proxy -j ACCEPT 
+-A ufw-before-output -o lo -s 127.0.0.1 -p tcp --dport 1079 -m owner --uid-owner proxy -j ACCEPT 
+-A ufw-before-output -o lo -d 127.0.0.1 -p tcp --dport 1079 -m owner --uid-owner debian-tor -j ACCEPT 
+
+#### IMPORTANT - uncomment this line here, for anonymous mode of operation - IMPORTANT ####
+#\-A ufw-before-output -o eth0 -s 192.168.100.100 ! -d 192.168.100.0/24 -j DROP 
+#### IMPORTANT - for anonymous mode of operation - IMPORTANT ####
+
+#-A ufw-before-output -p tcp --dport 1079 -j DROP 
+#-A ufw-before-output -p tcp --dport 1078 -j DROP 
+
+#-A ufw-before-forward -i eth1 -o eth0 -p tcp -d 192.168.100.0/24 -s 10.0.0.0/24 -j ACCEPT
+#-A ufw-before-forward -i eth1 -o eth0 -p udp -d 192.168.100.0/24 -s 10.0.0.0/24 -j ACCEPT
+#-A ufw-before-forward -i eth1 -o eth0 -d 192.168.100.0/24 -s 10.0.0.0/24 -j ACCEPT
+
+# allow all on loopback
+-A ufw-before-input -i lo -j ACCEPT
+-A ufw-before-output -o lo -j ACCEPT
+
+# quickly process packets for which we already have a connection
+-A ufw-before-input -m state --state RELATED,ESTABLISHED -j ACCEPT
+-A ufw-before-output -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+# drop INVALID packets (logs these in loglevel medium and higher)
+-A ufw-before-input -m state --state INVALID -j ufw-logging-deny
+-A ufw-before-input -m state --state INVALID -j DROP
+
+# ok icmp codes
+-A ufw-before-input -p icmp --icmp-type destination-unreachable -j ACCEPT
+-A ufw-before-input -p icmp --icmp-type source-quench -j ACCEPT
+-A ufw-before-input -p icmp --icmp-type time-exceeded -j ACCEPT
+-A ufw-before-input -p icmp --icmp-type parameter-problem -j ACCEPT
+-A ufw-before-input -p icmp --icmp-type echo-request -j ACCEPT
+
+# allow dhcp client to work
+-A ufw-before-input -p udp --sport 67 --dport 68 -j ACCEPT
+-A ufw-before-input -p udp --sport 68 --dport 67 -j ACCEPT
+
+# allow dhcp server to work
+-A ufw-before-output -p udp --sport 68 --dport 67 -j ACCEPT
+-A ufw-before-output -p udp --sport 67 --dport 68 -j ACCEPT
+
+#
+# ufw-not-local
+#
+-A ufw-before-input -j ufw-not-local
+
+# if LOCAL, RETURN
+-A ufw-not-local -m addrtype --dst-type LOCAL -j RETURN
+
+# if MULTICAST, RETURN
+-A ufw-not-local -m addrtype --dst-type MULTICAST -j RETURN
+
+# if BROADCAST, RETURN
+-A ufw-not-local -m addrtype --dst-type BROADCAST -j RETURN
+
+# all other non-local packets are dropped
+-A ufw-not-local -m limit --limit 3/min --limit-burst 10 -j ufw-logging-deny
+-A ufw-not-local -j DROP
+
+# allow MULTICAST mDNS for service discovery (be sure the MULTICAST line above
+# is uncommented)
+#-A ufw-before-input -p udp -d 224.0.0.251 --dport 5353 -j ACCEPT
+
+# allow MULTICAST UPnP for service discovery (be sure the MULTICAST line above
+# is uncommented)
+#-A ufw-before-input -p udp -d 239.255.255.250 --dport 1900 -j ACCEPT
+
+# don't delete the 'COMMIT' line or these rules won't be processed
+COMMIT
